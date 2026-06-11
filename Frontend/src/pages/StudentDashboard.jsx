@@ -3,6 +3,9 @@ import Sidebar from '../Components/Sidebar.jsx';
 import StatCard from '../Components/StatCard.jsx';
 import { FileEdit, ClipboardCheck, Percent, Layers, UploadCloud, CheckCircle2, AlertCircle } from 'lucide-react';
 
+// Setup the dynamic API base address
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
+
 export default function StudentDashboard({ user }) {
   const [currentTab, setCurrentTab] = useState('overview');
   const [applications, setApplications] = useState([]);
@@ -17,7 +20,7 @@ export default function StudentDashboard({ user }) {
 
   const fetchApplications = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/applications');
+      const res = await fetch(`${API_BASE_URL}/api/applications`);
       const data = await res.json();
       // Filter records mapped to logged student instance
       const filtered = data.filter(app => app.email === user.email);
@@ -28,7 +31,7 @@ export default function StudentDashboard({ user }) {
   const handleApply = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/applications/submit', {
+      const res = await fetch(`${API_BASE_URL}/api/applications/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...formData, student_name: user.fullname, email: user.email, phone: user.phone || 'N/A' })

@@ -3,6 +3,9 @@ import Sidebar from '../Components/Sidebar.jsx';
 import StatCard from '../Components/StatCard.jsx';
 import { Users, FileStack, ShieldCheck, AlertOctagon, TrendingUp } from 'lucide-react';
 
+// Setup the dynamic API base address
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
+
 export default function AdminDashboard() {
   const [currentTab, setCurrentTab] = useState('admin-dashboard');
   const [apps, setApps] = useState([]);
@@ -15,11 +18,11 @@ export default function AdminDashboard() {
 
   const fetchData = async () => {
     try {
-      const resApps = await fetch('http://127.0.0.1:5000/api/applications');
+      const resApps = await fetch(`${API_BASE_URL}/api/applications`);
       const dataApps = await resApps.json();
       setApps(dataApps);
 
-      const resStats = await fetch('http://127.0.0.1:5000/api/analytics/summary');
+      const resStats = await fetch(`${API_BASE_URL}/api/analytics/summary`);
       const dataStats = await resStats.json();
       setStats(dataStats);
     } catch (err) { console.error("Error connecting server layout maps:", err); }
@@ -27,7 +30,7 @@ export default function AdminDashboard() {
 
   const handleStatusUpdate = async (id, status) => {
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/applications/update-status', {
+      const res = await fetch(`${API_BASE_URL}/api/applications/update-status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status })
