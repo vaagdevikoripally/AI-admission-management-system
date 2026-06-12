@@ -11,116 +11,190 @@ export default function Auth({ onLoginSuccess }) {
   const [msg, setMsg] = useState({ text: '', type: '' });
   const navigate = useNavigate();
 
+  // Handle Input Changes
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  // Switch tabs and cleanly wipe out any old cross-contaminated validation alerts
+  const handleTabSwitch = (loginState) => {
+    setIsLogin(loginState);
+    setMsg({ text: '', type: '' }); // Wipes away previous error layouts
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setMsg({ text: '', type: '' }); // Clear messages at start of pipeline
+
     const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-    
+
     try {
+      // CRITICAL FIX: Only pass email/password to login endpoint so empty state keys don't break validations
+      const payload = isLogin 
+        ? { email: formData.email, password: formData.password }
+        : formData;
+
       const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
+
       const data = await res.json();
-      
-      if (!res.ok) throw new Error(data.error || 'Operation execution failure');
-      
+
+      if (!res.ok) {
+        // Capture specific backend error string layouts
+        throw new Error(data.error || 'Operation execution failure');
+      }
+
+      // Handle Success Paths
       if (isLogin) {
-        onLoginSuccess(data);
-        if (data.role === 'admin') navigate('/admin');
-        else navigate('/student');
+        setMsg({ text: 'Login successful! Syncing session metrics...', type: 'success' });
+        
+        // Save user metrics to persistent cache layer
+        localStorage.setItem('user', JSON.stringify(data));
+        if (onLoginSuccess) onLoginSuccess(data);
+
+        // Clear input tracking states
+        setFormData({ fullname: '', email: '', phone: '', password: '' });
+
+        // Route matching metrics to appropriate dashboards
+        if (data.role === 'admin') {
+          navigate('/admin-dashboard');
+        } else {
+          navigate('/student-dashboard');
+        }
       } else {
-        setMsg({ text: 'Registration completed successfully! Proceeding to entry login fields.', type: 'success' });
+        setMsg({ text: 'Registration successful! Please sign in.', type: 'success' });
+        // Flip student over to the login form tab view automatically
         setIsLogin(true);
       }
-    } catch (err) {
-      setMsg({ text: err.message, type: 'error' });
+
+    } catch (error) {
+      setMsg({ text: error.message || 'Unable to connect to operational pipeline matrix.', type: 'error' });
     }
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-6 bg-slate-50 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:16px_16px]">
-      <div className="bg-white border border-slate-200 shadow-xl rounded-2xl w-full max-w-md overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 bg-opacity-40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100">
+        
+        {/* Tab Selection Headers */}
         <div className="flex border-b border-slate-100">
-          <button 
-            onClick={() => { setIsLogin(true); setMsg({text:'', type:''}); }}
-            className={`w-1/2 py-4 text-center font-semibold text-sm transition-all ${isLogin ? 'text-blue-600 bg-slate-50/50 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+          <button
+            type="button"
+            className={`flex-1 py-4 text-center font-medium transition-all ${
+              isLogin ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-400 hover:text-slate-600'
+            }`}
+            onClick={() => handleTabSwitch(true)}
           >
             Sign In Account
           </button>
-          <button 
-            onClick={() => { setIsLogin(false); setMsg({text:'', type:''}); }}
-            className={`w-1/2 py-4 text-center font-semibold text-sm transition-all ${!isLogin ? 'text-blue-600 bg-slate-50/50 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+          <button
+            type="button"
+            className={`flex-1 py-4 text-center font-medium transition-all ${
+              !isLogin ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-400 hover:text-slate-600'
+            }`}
+            onClick={() => handleTabSwitch(false)}
           >
             Create Student Profile
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 flex flex-col gap-5">
+        {/* Form Submission Core Container */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          
+          {/* Dynamic Action Notification Message Alert Layout */}
           {msg.text && (
-            <div className={`p-3.5 rounded-xl text-xs font-semibold border ${msg.type === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700'}`}>
+            <div className={`p-3 rounded-lg text-sm font-medium border ${
+              msg.type === 'error' 
+                ? 'bg-red-50 text-red-600 border-red-100' 
+                : 'bg-green-50 text-green-600 border-green-100'
+            }`}>
               {msg.text}
             </div>
           )}
 
+          {/* Full Name Input Column (Only rendered for Registrations) */}
           {!isLogin && (
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-500 uppercase">Full Name</label>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Full Name</label>
               <div className="relative">
-                <User className="absolute left-3 top-3 text-slate-400" size={16} />
-                <input 
-                  type="text" required
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500"
-                  onChange={e => setFormData({...formData, fullname: e.target.value})} 
+                <User className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  name="fullname"
+                  required
+                  placeholder="John Doe"
+                  value={formData.fullname}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition-all text-slate-800"
                 />
               </div>
             </div>
           )}
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-slate-500 uppercase">Institutional Email Address</label>
+          {/* Institutional Email Address Column */}
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Institutional Email Address</label>
             <div className="relative">
-              <Mail className="absolute left-3 top-3 text-slate-400" size={16} />
-              <input 
-                type="email" required
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500"
-                onChange={e => setFormData({...formData, email: e.target.value})} 
+              <Mail className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+              <input
+                type="email"
+                name="email"
+                required
+                placeholder="student@university.edu"
+                value={formData.email}
+                onChange={handleChange() || handleChange}
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition-all text-slate-800"
               />
             </div>
           </div>
 
+          {/* Phone Metric Input Column (Only rendered for Registrations) */}
           {!isLogin && (
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-500 uppercase">Contact Phone Number</label>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Phone Connection Pipeline</label>
               <div className="relative">
-                <Phone className="absolute left-3 top-3 text-slate-400" size={16} />
-                <input 
-                  type="text" required
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500"
-                  onChange={e => setFormData({...formData, phone: e.target.value})} 
+                <Phone className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="tel"
+                  name="phone"
+                  required
+                  placeholder="+1 (555) 000-0000"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition-all text-slate-800"
                 />
               </div>
             </div>
           )}
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-slate-500 uppercase">Secure Profile Password</label>
+          {/* Secure Profile Password Column */}
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Secure Profile Password</label>
             <div className="relative">
-              <Lock className="absolute left-3 top-3 text-slate-400" size={16} />
-              <input 
-                type="password" required
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500"
-                onChange={e => setFormData({...formData, password: e.target.value})} 
+              <Lock className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+              <input
+                type="password"
+                name="password"
+                required
+                placeholder="••••••••"
+                value={formData.password}
+                onChange={handleChange}
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition-all text-slate-800"
               />
             </div>
           </div>
 
-          <button 
+          {/* Master Form Execution Action Button */}
+          <button
             type="submit"
-            className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-blue-600/10 transition-all mt-2"
+            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl shadow-lg shadow-indigo-100 transition-all transform active:scale-[0.98] mt-2"
           >
             {isLogin ? 'Sign In' : 'Register Profile Core'}
           </button>
+
         </form>
       </div>
     </div>
